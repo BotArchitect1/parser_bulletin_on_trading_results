@@ -20,17 +20,17 @@ async def main():
     await save_data_to_db(report_data)
     print("Main process finished.")
 
-    async with async_session_maker() as session:
-        repository = TradeResultRepository(session)
-
-        record_count = await repository.get_record_count()
-        print(f"Total records: {record_count}")
-
-        max_volume_trade = await repository.get_max_volume_trade()
-        print(f"Max volume trade: {max_volume_trade}")
-
-        unique_exchange_product_ids = await repository.get_unique_exchange_product_ids()
-        print(f"Unique exchange product IDs: {unique_exchange_product_ids}")
+    # async with async_session_maker() as session:
+    #     repository = TradeResultRepository(session)
+    #
+    #     record_count = await repository.get_record_count()
+    #     print(f"Total records: {record_count}")
+    #
+    #     max_volume_trade = await repository.get_max_volume_trade()
+    #     print(f"Max volume trade: {max_volume_trade}")
+    #
+    #     unique_exchange_product_ids = await repository.get_unique_exchange_product_ids()
+    #     print(f"Unique exchange product IDs: {unique_exchange_product_ids}")
 
 if __name__ == "__main__":
     async def run():

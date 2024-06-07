@@ -1,9 +1,11 @@
+import os
+
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-from app.utils.extract_xml import extract_report_data
+from app.utils.extract_xml import extract_report_data, save_data_to_db
 
 BASE_URL = 'https://spimex.com/markets/oil_products/trades/results/'
 
@@ -22,7 +24,7 @@ async def get_report_links(page_html):
     for item in soup.select('.accordeon-inner__wrap-item'):
         link = item.select_one('.accordeon-inner__item-title.link.xls')
         if link:
-            report_links.append(BASE_URL + link.get('href'))
+            report_links.append("https://spimex.com" + link.get('href'))
         date_elem = item.select_one('.accordeon-inner__item-inner__title span')
         if date_elem:
             date_str = date_elem.text.strip()
@@ -30,16 +32,26 @@ async def get_report_links(page_html):
     return list(zip(report_links, dates))
 
 
-async def download_report(session, url, date):
-    print(f"Downloading report for date: {date}")
+async def download_file(session, url, date, folder='downloads'):
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{folder}/{date}.xls"
+    print(f"Downloading file: {filename} from {url}")
     async with session.get(url) as response:
-        content = await response.read()
-        return content, date
+        if response.status == 200:
+            content = await response.read()
+            with open(filename, 'wb') as f:
+                f.write(content)
+            print(f"Successfully downloaded {filename}")
+        else:
+            print(f"Failed to download {url}: HTTP {response.status}")
 
 
-async def scrape_reports(start_page=1, end_page=5):
+async def scrape_reports(start_page=1, end_page=2):
     print("Starting report scraping...")
     tasks = []
+    all_data = []
+    link_date_map = {}
+
     async with aiohttp.ClientSession() as session:
         for page in range(start_page, end_page + 1):
             page_url = f"{BASE_URL}?page=page-{page}"
@@ -47,13 +59,19 @@ async def scrape_reports(start_page=1, end_page=5):
             report_links_and_dates = await get_report_links(page_html)
             for link, date in report_links_and_dates:
                 if date.year >= 2023:
-                    task = asyncio.create_task(download_report(session, link, date))
+                    link_date_map[link] = date
+                    task = asyncio.create_task(download_file(session, link, date))
                     tasks.append(task)
-        report_data = []
-        print("Extracting report data...")
-        for task in asyncio.as_completed(tasks):
-            content, date = await task
-            report_data.extend(await extract_report_data(content, date))
-    print("Report scraping finished.")
-    return report_data
 
+        await asyncio.gather(*tasks)
+        print("Extracting report data...")
+        for link, date in link_date_map.items():
+            file_path = f"downloads/{date}.xls"
+            report_data = extract_report_data(file_path)
+            for item in report_data:
+                item['date'] = date
+                item['created_on'] = datetime.now()
+                item['updated_on'] = datetime.now()
+            all_data.extend(report_data)
+
+    return all_data

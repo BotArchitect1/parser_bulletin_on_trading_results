@@ -1,36 +1,50 @@
 from datetime import datetime
 from typing import List, Dict
 import io
-
+import pandas as pd
 import openpyxl
+from openpyxl.reader.excel import load_workbook
 
 from app.db.models import TradeResult
 from app.db.database import async_session_maker
 
+import xlrd
 
-async def extract_report_data(content: bytes, date: datetime.date) -> List[Dict]:
-    print(f"Extracting report data for date: {date}")
 
-    if not content.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"):
-        print(f"Skipping file for date {date}: File is not in exel format")
-        return []
-
-    workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-    worksheet = workbook.active
+def extract_report_data(file_path):
+    workbook = xlrd.open_workbook(file_path)
+    sheet = workbook.sheet_by_index(0)
 
     data = []
-    for row in worksheet.iter_rows(min_row=7, values_only=True):
-        if row[-1] > 0:  # Если количество договоров больше 0
-            data.append({
-                'exchange_product_id': row[0],
-                'exchange_product_name': row[1],
-                'delivery_basis_name': row[2],
-                'volume': row[3],
-                'total': row[4],
-                'count': row[-1],
-                'date': date
-            })
+    found_table = False
+    headers = {}
 
+    for row_idx in range(sheet.nrows):
+        row = sheet.row_values(row_idx)
+        if ''.join(row).strip() == 'Единица измерения: Метрическая тонна':
+            found_table = True
+        elif found_table:
+            if any(row):
+                if not headers:
+                    headers = {header.lower().replace('\n', ' '): idx for idx, header in enumerate(row)}
+                else:
+                    exchange_product_id = row[headers['код инструмента']]
+                    exchange_product_name = row[headers['наименование инструмента']]
+                    delivery_basis_name = row[headers['базис поставки']]
+                    volume = row[headers['объем договоров в единицах измерения']]
+                    total = row[headers['обьем договоров, руб.']]
+                    count = row[headers['количество договоров, шт.']]
+
+                    if count > '0' and exchange_product_id not in ('Итого:', 'Итого по секции:'):
+                        data.append({
+                            'exchange_product_id': exchange_product_id,
+                            'exchange_product_name': exchange_product_name,
+                            'delivery_basis_name': delivery_basis_name,
+                            'volume': volume,
+                            'total': total,
+                            'count': count
+                        })
+    print(data)
     return data
 
 
