@@ -58,6 +58,3 @@ def extract_report_data(file_path):
                             }
                         )
     return data
-
-
-
