@@ -49,4 +49,6 @@ def load_config(path: str = ".env") -> Config:
     )
 
 
-config = load_config("/home/pavel/PycharmProjects/parser_bulletin_on_trading_results/.env")
+config = load_config(
+    "/home/pavel/PycharmProjects/parser_bulletin_on_trading_results/.env"
+)

@@ -5,12 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.parser.scrapping import scrape_reports
 from app.db.database import Base, async_session_maker, engine
 from app.db.repository import TradeResultRepository
-from app.utils.extract_xml import save_data_to_db
+from app.db.save_data import save_data_to_db
 from app.db.models import TradeResult
 
 
-async def create_tables(engine: AsyncEngine):
-    async with engine.begin() as conn:
+async def create_tables(engine_db: AsyncEngine):
+    async with engine_db.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
@@ -32,11 +32,12 @@ async def main():
         unique_exchange_product_ids = await repository.get_unique_exchange_product_ids()
         print(f"Unique exchange product IDs: {unique_exchange_product_ids}")
 
+
 if __name__ == "__main__":
+
     async def run():
 
         await create_tables(engine)
         await main()
 
     asyncio.run(run())
-
